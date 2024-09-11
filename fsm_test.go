@@ -24,8 +24,7 @@ import (
 	"time"
 )
 
-type fakeTransitionerObj struct {
-}
+type fakeTransitionerObj struct{}
 
 func (t fakeTransitionerObj) transition(f *FSM) error {
 	return &InternalError{}
@@ -39,9 +38,31 @@ func TestSameState(t *testing.T) {
 		},
 		Callbacks{},
 	)
-	_ = fsm.Event(context.Background(), "run")
+	err := fsm.Event(context.Background(), "run")
 	if fsm.Current() != "start" {
 		t.Error("expected state to be 'start'")
+	}
+	if err == nil {
+		t.Error("expected no transition error")
+	}
+}
+
+func TestSameStateWithProcessNoTransitionStatesEnabled(t *testing.T) {
+	fsm := NewFSM(
+		"start",
+		Events{
+			{Name: "run", Src: []string{"start"}, Dst: "start"},
+		},
+		Callbacks{},
+	)
+	fsm.SetProcessNoTransitionStates(true)
+	err := fsm.Event(context.Background(), "run")
+	if fsm.Current() != "start" {
+		t.Error("expected state to be 'start'")
+	}
+
+	if err != nil {
+		t.Error("expected no errors")
 	}
 }
 
@@ -544,7 +565,7 @@ func TestCancelAsyncTransition(t *testing.T) {
 	if !ok {
 		t.Errorf("expected error to be 'AsyncError', got %v", err)
 	}
-	var asyncStateTransitionWasCanceled = make(chan struct{})
+	asyncStateTransitionWasCanceled := make(chan struct{})
 	go func() {
 		<-asyncError.Ctx.Done()
 		close(asyncStateTransitionWasCanceled)
@@ -772,7 +793,7 @@ func TestTransitionInCallbacks(t *testing.T) {
 
 func TestContextInCallbacks(t *testing.T) {
 	var fsm *FSM
-	var enterEndAsyncWorkDone = make(chan struct{})
+	enterEndAsyncWorkDone := make(chan struct{})
 	fsm = NewFSM(
 		"start",
 		Events{
